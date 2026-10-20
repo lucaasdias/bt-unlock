@@ -43,6 +43,14 @@ the most value.
   install from the Homebrew Channel app store, open the app, done.
 - Be distributed as open source, packaged as an installable IPK, and
   published to the default webosbrew repository.
+- **Ship translated into Brazilian Portuguese, English, and the other
+  major languages**, not just one. The UI is small enough (a handful of
+  buttons and short labels, no paragraphs of text) that this is cheap:
+  a flat key→string JSON file per locale, picked at launch from the
+  device's system language (`PalmSystem.locale`/`localeRegion`), with
+  English as the fallback for anything untranslated. English is required
+  either way, since that's what the rest of the repo listing (Kodi,
+  RetroArch, etc.) and the publishing PR itself are in.
 
 ## Non-goals
 
@@ -120,6 +128,12 @@ the most value.
   this directly installing Kodi), submitted via PR to
   `webosbrew/repo.webosbrew.org` following their existing app metadata
   format (same shape as the entries we read for Kodi, RetroArch, etc.).
+
+- **Source repository: `github.com/lucaasdias/bt-unlock`**, on your own
+  GitHub account (logged in locally as `lucaasdias`), public from the
+  start. A licence (MIT or GPLv3 — the implementation plan should pick
+  one) satisfies both the repo's "main" pool requirement and its
+  `sourceUrl` rule.
 
 ## Decisions already made (by the builder, during brainstorming)
 
