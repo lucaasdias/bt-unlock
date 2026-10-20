@@ -8,7 +8,7 @@
 //
 // Loaded as a plain <script> tag in the browser (attaches `render` and
 // `isAdapterPowered` to `window`) and exported via CommonJS under Node.
-(function (global, execRef) {
+(function (global, execRef, tRef) {
   'use strict';
 
   // isAdapterPowered() -> Promise<boolean>
@@ -48,12 +48,12 @@
     wrapper.className = 'status-screen';
 
     var heading = document.createElement('h1');
-    heading.textContent = 'Bluetooth';
+    heading.textContent = tRef('status.heading');
     wrapper.appendChild(heading);
 
     var stateLabel = document.createElement('p');
     stateLabel.className = 'status-state';
-    stateLabel.textContent = 'Checking adapter status...';
+    stateLabel.textContent = tRef('status.checking');
     wrapper.appendChild(stateLabel);
 
     var errorLabel = document.createElement('p');
@@ -64,7 +64,7 @@
     var toggleButton = document.createElement('button');
     toggleButton.type = 'button';
     toggleButton.className = 'status-toggle';
-    toggleButton.textContent = 'Turn on';
+    toggleButton.textContent = tRef('status.turnOn');
     wrapper.appendChild(toggleButton);
 
     container.appendChild(wrapper);
@@ -81,7 +81,7 @@
 
     function refresh() {
       return isAdapterPowered().then(function (powered) {
-        stateLabel.textContent = powered ? 'Adapter: on' : 'Adapter: off';
+        stateLabel.textContent = tRef(powered ? 'status.adapterOn' : 'status.adapterOff');
         toggleButton.hidden = powered;
         return powered;
       });
@@ -92,11 +92,11 @@
       clearError();
       execRef('bt-power.sh', ['on']).then(function (result) {
         if (!result.ok) {
-          showError('Could not turn on the adapter: ' + (result.errorText || 'unknown error'));
+          showError(tRef('status.turnOnError', { error: result.errorText || tRef('common.unknownError') }));
         }
         return refresh();
       }).catch(function (err) {
-        showError('Could not turn on the adapter: ' + err.message);
+        showError(tRef('status.turnOnError', { error: err.message }));
       }).then(function () {
         toggleButton.disabled = false;
       });
@@ -105,8 +105,8 @@
     toggleButton.addEventListener('click', handleToggle);
 
     refresh().catch(function (err) {
-      stateLabel.textContent = 'Adapter: unknown';
-      showError('Could not read adapter status: ' + err.message);
+      stateLabel.textContent = tRef('status.adapterUnknown');
+      showError(tRef('status.readError', { error: err.message }));
     });
   }
 
@@ -121,4 +121,8 @@
     global.render = render;
     global.isAdapterPowered = isAdapterPowered;
   }
-})(typeof window !== 'undefined' ? window : this, typeof window !== 'undefined' ? window.exec : require('../luna.js').exec);
+})(
+  typeof window !== 'undefined' ? window : this,
+  typeof window !== 'undefined' ? window.exec : require('../luna.js').exec,
+  typeof window !== 'undefined' ? window.t : require('../i18n.js').t
+);

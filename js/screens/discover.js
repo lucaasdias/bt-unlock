@@ -9,7 +9,7 @@
 // Loaded as a plain <script> tag in the browser (attaches `renderDiscover`
 // to `window` — named distinctly from status.js's `render` so the two
 // screens' globals don't collide) and exported via CommonJS under Node.
-(function (global, execRef, classifyRef, isAdapterPoweredRef) {
+(function (global, execRef, classifyRef, isAdapterPoweredRef, tRef) {
   'use strict';
 
   var POLL_INTERVAL_MS = 2000;
@@ -54,7 +54,7 @@
     wrapper.className = 'discover-screen';
 
     var heading = document.createElement('h1');
-    heading.textContent = 'Discover devices';
+    heading.textContent = tRef('discover.heading');
     wrapper.appendChild(heading);
 
     var statusLabel = document.createElement('p');
@@ -92,17 +92,17 @@
     function showAdapterOffPrompt() {
       stopPolling();
       wrapper.innerHTML = '';
-      heading.textContent = 'Discover devices';
+      heading.textContent = tRef('discover.heading');
       wrapper.appendChild(heading);
 
       var message = document.createElement('p');
       message.className = 'discover-status';
-      message.textContent = 'The Bluetooth adapter is off. Turn it on to discover devices.';
+      message.textContent = tRef('discover.adapterOffMessage');
       wrapper.appendChild(message);
 
       var goToStatusButton = document.createElement('button');
       goToStatusButton.type = 'button';
-      goToStatusButton.textContent = 'Go to Status';
+      goToStatusButton.textContent = tRef('discover.goToStatus');
       goToStatusButton.addEventListener('click', function () {
         navigate('status');
       });
@@ -127,7 +127,7 @@
         button.type = 'button';
         button.disabled = busy;
         var label = device.name && device.name.length > 0 ? device.name : device.address;
-        button.textContent = '[' + classified.iconId + '] ' + label + ' (' + classified.kind + ')';
+        button.textContent = '[' + classified.iconId + '] ' + label + ' (' + tRef('device.kind.' + classified.kind) + ')';
         button.addEventListener('click', function () {
           handleSelect(device, classified);
         });
@@ -154,18 +154,18 @@
             if (!powered) {
               showAdapterOffPrompt();
             } else {
-              showError('Discovery failed: ' + (result.errorText || 'unknown error'));
+              showError(tRef('discover.discoveryFailed', { error: result.errorText || tRef('common.unknownError') }));
             }
           });
         }
         clearError();
-        statusLabel.textContent = 'Scanning...';
+        statusLabel.textContent = tRef('discover.scanning');
         var reply = result.replies[result.replies.length - 1];
         var devices = (reply && reply.devices) || [];
         renderDeviceList(devices);
       }).catch(function (err) {
         pollInFlight = false;
-        showError('Discovery failed: ' + err.message);
+        showError(tRef('discover.discoveryFailed', { error: err.message }));
       });
     }
 
@@ -202,7 +202,7 @@
     function handleSelect(device, classified) {
       var label = device.name && device.name.length > 0 ? device.name : device.address;
       clearError();
-      setBusy(true, 'Pairing with ' + label + '...');
+      setBusy(true, tRef('discover.pairing', { device: label }));
 
       pairAttemptToken += 1;
       var thisAttempt = pairAttemptToken;
@@ -226,13 +226,13 @@
           // untested, known gap for this screen (see task-5-report.md);
           // today it is shown as this same generic pairing-failed error
           // rather than its own "enter PIN" flow.
-          showError('Pairing failed: ' + (pairResult.errorText || 'unknown error'));
+          showError(tRef('discover.pairingFailed', { error: pairResult.errorText || tRef('common.unknownError') }));
           setBusy(false);
           return;
         }
 
         stage = 'connect';
-        setBusy(true, 'Connecting to ' + label + '...');
+        setBusy(true, tRef('discover.connecting', { device: label }));
         return raceTimeout(execRef('bt-connect.sh', [device.address, classified.profile]), CONNECT_TIMEOUT_MS).then(function (connectResult) {
           if (isStale()) {
             return;
@@ -246,9 +246,9 @@
           // task's connect-timeout fix.
           setBusy(false);
           if (!connectResult.ok) {
-            showError('Connect failed: ' + (connectResult.errorText || 'unknown error'));
+            showError(tRef('discover.connectFailed', { error: connectResult.errorText || tRef('common.unknownError') }));
           } else {
-            statusLabel.textContent = 'Connected: ' + label;
+            statusLabel.textContent = tRef('discover.connected', { device: label });
           }
         });
       }).catch(function (err) {
@@ -272,10 +272,12 @@
         var message;
         if (err.message === 'timed out') {
           message = stage === 'pair'
-            ? 'Pairing timed out. The device may be out of range, or may need a PIN this app can\'t supply yet.'
-            : 'Connecting timed out. The device may not support this profile, or may be out of range.';
+            ? tRef('discover.pairingTimedOut')
+            : tRef('discover.connectTimedOut');
         } else {
-          message = (stage === 'pair' ? 'Pairing failed: ' : 'Connect failed: ') + err.message;
+          message = stage === 'pair'
+            ? tRef('discover.pairingFailed', { error: err.message })
+            : tRef('discover.connectFailed', { error: err.message });
         }
         showError(message);
         setBusy(false);
@@ -306,5 +308,6 @@
   typeof window !== 'undefined' ? window : this,
   typeof window !== 'undefined' ? window.exec : require('../luna.js').exec,
   typeof window !== 'undefined' ? window.classify : require('../devices.js').classify,
-  typeof window !== 'undefined' ? window.isAdapterPowered : require('./status.js').isAdapterPowered
+  typeof window !== 'undefined' ? window.isAdapterPowered : require('./status.js').isAdapterPowered,
+  typeof window !== 'undefined' ? window.t : require('../i18n.js').t
 );
