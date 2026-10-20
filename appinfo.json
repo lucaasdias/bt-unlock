@@ -1,0 +1,12 @@
+{
+  "id": "org.lucaasdias.btunlock",
+  "version": "0.1.0",
+  "vendor": "Lucas Dias",
+  "type": "web",
+  "main": "index.html",
+  "title": "BT Unlock",
+  "icon": "icon.png",
+  "largeIcon": "largeIcon.png",
+  "uiRevision": 2,
+  "trustLevel": "default"
+}
