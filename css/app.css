@@ -18,3 +18,19 @@ body {
   font-size: 48px;
   margin: 0;
 }
+
+/* Remote-control focus (Task 8).
+ *
+ * Every row in this app is a plain <button>, so one rule covers the nav
+ * bar and every screen's rows alike. Deliberately loud — big filled
+ * background plus a thick, high-contrast outline — because this has to
+ * read from sofa distance on a TV, not just pass a mouse-hover glance.
+ * Task 9 replaces this with the full visual redesign's own focus style,
+ * built on top of the same D-pad logic (js/router.js) this unblocks.
+ */
+button:focus {
+  outline: 4px solid #5cc8ff;
+  outline-offset: 2px;
+  background-color: #1f3a52;
+  color: #fff;
+}
