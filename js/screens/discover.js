@@ -30,6 +30,15 @@
   // and Homebrew Channel's own exec service has no timeout of its own.
   // Without this, that's exactly the "stuck spinner forever" anti-goal.
   var PAIR_TIMEOUT_MS = 20000;
+  // bt-connect.sh's `<profile>/connect` call needs the same safety net as
+  // bt-pair.sh, for the same anti-goal reason — confirmed live, not just
+  // in theory: a direct `hid/connect` call against a real device (a BLE-
+  // only controller that doesn't actually expose classic HID) hung for
+  // 20+ seconds with no response at all before being killed manually.
+  // `exec()` has no timeout of its own, so without this a bad profile
+  // match or an unresponsive device would hang the UI exactly the same
+  // way the unwrapped pair call used to.
+  var CONNECT_TIMEOUT_MS = 20000;
 
   // render(container: HTMLElement, navigate: (name: string) => void) -> Function
   //   Returns a cleanup function the router calls before tearing this
@@ -201,6 +210,10 @@
         return thisAttempt !== pairAttemptToken;
       }
 
+      // Tracks which leg timed out, since both legs share one .catch
+      // below but need different, accurate messages.
+      var stage = 'pair';
+
       raceTimeout(execRef('bt-pair.sh', [device.address]), PAIR_TIMEOUT_MS).then(function (pairResult) {
         if (isStale()) {
           return;
@@ -218,32 +231,52 @@
           return;
         }
 
+        stage = 'connect';
         setBusy(true, 'Connecting to ' + label + '...');
-        return execRef('bt-connect.sh', [device.address, classified.profile]).then(function (connectResult) {
+        return raceTimeout(execRef('bt-connect.sh', [device.address, classified.profile]), CONNECT_TIMEOUT_MS).then(function (connectResult) {
           if (isStale()) {
             return;
           }
+          // setBusy(false) resets statusLabel.textContent to '' (no
+          // message passed), so it must run BEFORE setting the
+          // "Connected: X" success text below, or this would immediately
+          // overwrite it back to blank — a real bug caught by local
+          // testing of this exact change (see task-5-report.md): the
+          // success message never actually displayed, even before this
+          // task's connect-timeout fix.
+          setBusy(false);
           if (!connectResult.ok) {
             showError('Connect failed: ' + (connectResult.errorText || 'unknown error'));
           } else {
             statusLabel.textContent = 'Connected: ' + label;
           }
-          setBusy(false);
         });
       }).catch(function (err) {
         if (isStale()) {
           return;
         }
-        // Covers both a genuine exec()/script failure and the client-side
-        // pairing timeout above (confirmed live: a non-"Just Works" or
-        // unreachable device leaves bt-pair.sh's `luna-send -n 3` blocked
-        // indefinitely with no error — this timeout is what returns the
-        // UI to a clean, re-triable state instead of a stuck spinner).
-        // The script itself keeps running on the TV in the background in
-        // that case; it isn't and can't cheaply be cancelled from here.
-        var message = err.message === 'timed out'
-          ? 'Pairing timed out. The device may be out of range, or may need a PIN this app can\'t supply yet.'
-          : 'Pairing failed: ' + err.message;
+        // Covers both a genuine exec()/script failure and either leg's
+        // client-side timeout above. The pair leg hanging indefinitely
+        // (a non-"Just Works" or unreachable device) is confirmed live.
+        // The connect leg wraps the exact same raceTimeout() helper the
+        // same way for the same reason — confirmed live that bt-connect.sh's
+        // `<profile>/connect` call itself CAN hang indefinitely (a bad
+        // profile match or unresponsive device, 20+s with no response,
+        // no error, nothing from Homebrew's exec service either), but
+        // the wrapped recovery path for this specific leg is reasoned
+        // from the identical, already-proven pair-leg pattern rather
+        // than independently re-observed live — see task-5-report.md.
+        // The underlying script keeps running on the TV in the
+        // background in that case; it isn't and can't cheaply be
+        // cancelled from here.
+        var message;
+        if (err.message === 'timed out') {
+          message = stage === 'pair'
+            ? 'Pairing timed out. The device may be out of range, or may need a PIN this app can\'t supply yet.'
+            : 'Connecting timed out. The device may not support this profile, or may be out of range.';
+        } else {
+          message = (stage === 'pair' ? 'Pairing failed: ' : 'Connect failed: ') + err.message;
+        }
         showError(message);
         setBusy(false);
       });
