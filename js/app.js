@@ -1,9 +1,7 @@
-// app.js — entry point. Wires the current default screen into the page.
+// app.js — entry point. Wires the router and its screens into the page.
 //
-// There is only one screen so far (status), so this doesn't need a router
-// yet (Task 5 introduces js/router.js when Discover is added). Runs on
-// DOMContentLoaded so it works regardless of where the <script> tag sits
-// in index.html.
+// Runs on DOMContentLoaded so it works regardless of where the <script>
+// tag sits in index.html.
 (function (global) {
   'use strict';
 
@@ -12,7 +10,11 @@
     if (!container) {
       return;
     }
-    global.render(container);
+    var router = global.createRouter({
+      status: { label: 'Status', render: global.render },
+      discover: { label: 'Discover', render: global.renderDiscover }
+    });
+    router.mount(container, 'status');
   }
 
   if (document.readyState === 'loading') {
