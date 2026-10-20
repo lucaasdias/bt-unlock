@@ -78,10 +78,32 @@ the most value.
 - **Root + Homebrew Channel required.** The `bluetooth.management` and
   `bluetooth.operation` ACGs that gate `com.webos.service.bluetooth2`'s
   pairing/discovery methods are not available to a normal sandboxed app.
-  The app's own backend service must run elevated (the same
-  `elevate-service` mechanism Homebrew Channel provides to other apps, e.g.
-  `webOS Terminal`), the same way the Homebrew Channel service itself runs
-  with permanent elevated privileges after `autoroot.sh`.
+- **No SSH, no separate elevation step, confirmed working.** We verified
+  directly on the test device that Homebrew Channel's own
+  already-elevated service exposes a general-purpose root command runner,
+  `luna://org.webosbrew.hbchannel.service/exec`, callable by any app:
+  ```
+  luna-send -n 1 -f luna://org.webosbrew.hbchannel.service/exec '{"command":"id"}'
+  → {"returnValue":true,"stdoutString":"uid=0(root) ...\n", ...}
+  ```
+  This means BT Unlock does **not** need its own native service or its own
+  `elevate-service` dance at all for one-shot commands (power on/off, pair,
+  connect, disconnect, forget) — it runs them by calling `exec` with the
+  equivalent `luna-send` command string from plain JavaScript in the web
+  app, same as any other Luna call. This is the thing we were least sure
+  of going into this document, and it is now the most solid part of the
+  plan: install from the Homebrew Channel store like any other app, open
+  it, use it. No SSH.
+  **Open question for the implementation plan:** `exec` is a single
+  blocking call, not a subscription. Our tested pairing flow needed a
+  *subscribed*, multi-reply call (`adapter/pair` with `subscribe:true`,
+  to receive the passkey-request event and the final result as separate
+  messages) and a live-updating device list (`device/getStatus` with
+  `subscribe:true`). Whether `exec` can carry a subscribed `luna-send -i`
+  session, or whether discovery/pairing need to be polled instead (repeat
+  `exec` calls against `device/getStatus` without `subscribe`, on a
+  timer), is unresolved and is the first thing the implementation plan
+  needs to settle — by testing against a real device, not by assuming.
 - **webOS 4.0+ as the supported floor, best-effort below that.** This
   matches Kodi's stated floor on the same repo and the device we tested on
   (webOS 4.0–4.4, SoC `m3`). Older firmware (webOS 1–3) is not excluded
@@ -115,7 +137,31 @@ the most value.
   `webOS Terminal` service survive a reboot. A script here powers the
   adapter back on and (if we decide to auto-reconnect paired accessories
   rather than relying on each device's own reconnect behavior) issues the
-  `hid`/`a2dp` reconnect calls for trusted devices.
+  `hid`/`a2dp` reconnect calls for trusted devices. Per the official
+  "Respect the Hardware" publishing rule, the script **must** be
+  symlinked into `/var/lib/webosbrew/init.d/`, not copied (so removing
+  the app removes the hook); **must** check that its target exists before
+  acting and stop if it doesn't; and **should** write what it did to a
+  file under `/var/lib/webosbrew/` for anyone debugging a boot problem
+  later.
+- **Publishing follows the documented webosbrew process exactly**, not a
+  guess at one: fork `webosbrew/apps-repo`, add one
+  `packages/<app-id>.yml` (title, `iconUri`, `manifestUrl`, `category:
+  utility`, `pool: main`, markdown `description`, optional `funding`),
+  and host the built IPK plus a generated manifest together in a GitHub
+  Release (`webosbrew-toolbox-gen-manifest` writes the manifest from the
+  built IPK; a fresh one is needed per release since it hashes the exact
+  file). `requirements.webosRelease` and `requirements.deviceSoC` in that
+  manifest are how we declare the webOS 4.0+ floor and flag any SoC this
+  turns out not to work on, the same way Kodi's listing flags `k5lp`.
+- **Rule 1 of publishing ("No AI Slop") applies directly to this project**
+  and is binding on you, not me: the submission's AI-disclosure checkbox
+  must be filled honestly, you must have run the app on a real TV and be
+  able to name the model and webOS release (this one: a 2018
+  `43LK5750PSA`, webOS 4.0–4.4, SoC `m3`), and you must be able to answer
+  for why the code is written the way it is. I can write the
+  implementation, but the PR, the testing claim, and being able to defend
+  the code are yours to carry.
 - **Device-type detection** uses the Bluetooth class-of-device /
   appearance bitfields already returned by `device/getStatus`
   (`classOfDevice`) to choose an icon and the profile to connect
