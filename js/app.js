@@ -12,7 +12,8 @@
     }
     var router = global.createRouter({
       status: { label: 'Status', render: global.render },
-      discover: { label: 'Discover', render: global.renderDiscover }
+      discover: { label: 'Discover', render: global.renderDiscover },
+      paired: { label: 'Paired', render: global.renderPaired }
     });
     router.mount(container, 'status');
   }
