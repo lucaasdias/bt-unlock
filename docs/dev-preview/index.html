@@ -1,0 +1,30 @@
+<!-- DEV-ONLY: desktop-browser preview harness for taking README screenshots.
+     Never shipped — docs/ is excluded from package.sh's IPK staging. Loads
+     the real, unmodified app files from ../../ with a mocked Luna bridge
+     (./mock.js) so the real UI renders without a webOS device. -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BT Unlock — dev preview</title>
+  <link rel="stylesheet" href="../../css/app.css">
+</head>
+<body>
+  <main id="app"></main>
+  <!-- Mock Luna bridge MUST load before the real app scripts below, so
+       window.PalmServiceBridge/window.PalmSystem already exist when
+       js/luna.js and js/app.js run. -->
+  <script src="mock.js"></script>
+  <script src="../../js/luna.js"></script>
+  <script src="../../js/devices.js"></script>
+  <script src="../../js/i18n.js"></script>
+  <script src="../../js/qrcode.js"></script>
+  <script src="../../js/router.js"></script>
+  <script src="../../js/screens/status.js"></script>
+  <script src="../../js/screens/discover.js"></script>
+  <script src="../../js/screens/paired.js"></script>
+  <script src="../../js/screens/settings.js"></script>
+  <script src="../../js/app.js"></script>
+</body>
+</html>

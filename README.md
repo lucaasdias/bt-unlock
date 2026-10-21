@@ -7,8 +7,11 @@ the ones the stock TV UI won't even show you.**
 
 </div>
 
-> Screenshot coming soon — a real on-device screenshot still needs to be
-> added here by hand (see [Screenshots](#screenshots) below).
+<div align="center">
+
+![Status screen](docs/screenshots/status.jpg)
+
+</div>
 
 ---
 
@@ -97,8 +100,13 @@ can disable from the Status screen at any time.
 
 ## Screenshots
 
-Not included yet. If you'd like to contribute a few (Status, Discover,
-Paired, Settings) from a real device, a pull request is welcome.
+| Status | Discover |
+|---|---|
+| ![Status screen](docs/screenshots/status.jpg) | ![Discover screen](docs/screenshots/discover.jpg) |
+
+| Paired | Settings |
+|---|---|
+| ![Paired screen](docs/screenshots/paired.jpg) | ![Settings screen](docs/screenshots/settings.jpg) |
 
 ## License
 
