@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="icon.png" width="140" height="140" alt="BT Unlock icon">
+<img src="docs/assets/icon-hero.svg" width="140" height="140" alt="BT Unlock icon">
 
 # BT Unlock
 
