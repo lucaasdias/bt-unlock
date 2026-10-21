@@ -1,15 +1,16 @@
 <div align="center">
 
+<img src="icon.png" width="140" height="140" alt="BT Unlock icon">
+
 # BT Unlock
 
 **Pair, connect, and manage Bluetooth accessories on a rooted LG webOS TV —
 the ones the stock TV UI won't even show you.**
 
-</div>
-
-<div align="center">
-
-![Status screen](docs/screenshots/status.jpg)
+![webOS](https://img.shields.io/badge/webOS-4.0%2B-49c9ff)
+![Homebrew Channel](https://img.shields.io/badge/Homebrew%20Channel-root%20required-49c9ff)
+![License](https://img.shields.io/github/license/lucaasdias/bt-unlock)
+![Release](https://img.shields.io/github/v/release/lucaasdias/bt-unlock)
 
 </div>
 
