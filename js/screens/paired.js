@@ -26,6 +26,17 @@
   // back to a usable state.
   var ACTION_TIMEOUT_MS = 20000;
 
+  // ICON_GLYPHS — presentation-only map from devices.js's classify()
+  // iconId to a glyph shown inside the device-row's icon circle (Task 9
+  // design system), identical to discover.js's. Purely cosmetic.
+  var ICON_GLYPHS = {
+    gamepad: '🎮',
+    keyboard: '⌨️',
+    mouse: '🖱️',
+    audio: '🎧',
+    unknown: '❓'
+  };
+
   // render(container: HTMLElement, navigate: (name: string) => void) -> Function
   //   Returns a cleanup function the router calls before tearing this
   //   screen down. There is no polling timer to stop, but an in-flight
@@ -40,9 +51,33 @@
     var wrapper = document.createElement('div');
     wrapper.className = 'paired-screen';
 
+    // Heading + refresh button share one row (.screen-header, css/app.css)
+    // rather than the refresh button sitting as its own block between the
+    // heading and the list — feedback from the human partner looking at
+    // the real TV: a lone button floating there read as disconnected from
+    // both the heading above and the list below it. Markup/CSS-only:
+    // refreshButton is still the same element, same click handler, same
+    // tab-order position among this screen's focusable elements (right
+    // after the heading, before any device row) — js/router.js's
+    // row-grouping only cares about DOM order and the `device-row`
+    // ancestor class, neither of which this changes.
+    var header = document.createElement('div');
+    header.className = 'screen-header';
+
     var heading = document.createElement('h1');
     heading.textContent = tRef('paired.heading');
-    wrapper.appendChild(heading);
+    header.appendChild(heading);
+
+    var refreshButton = document.createElement('button');
+    refreshButton.type = 'button';
+    refreshButton.className = 'btn btn-secondary';
+    refreshButton.textContent = tRef('paired.refresh');
+    refreshButton.addEventListener('click', function () {
+      load();
+    });
+    header.appendChild(refreshButton);
+
+    wrapper.appendChild(header);
 
     var statusLabel = document.createElement('p');
     statusLabel.className = 'paired-status';
@@ -52,14 +87,6 @@
     errorLabel.className = 'paired-error';
     errorLabel.hidden = true;
     wrapper.appendChild(errorLabel);
-
-    var refreshButton = document.createElement('button');
-    refreshButton.type = 'button';
-    refreshButton.textContent = tRef('paired.refresh');
-    refreshButton.addEventListener('click', function () {
-      load();
-    });
-    wrapper.appendChild(refreshButton);
 
     var list = document.createElement('ul');
     list.className = 'paired-list';
@@ -109,6 +136,7 @@
 
       if (paired.length === 0) {
         var empty = document.createElement('li');
+        empty.className = 'list-empty';
         empty.textContent = tRef('paired.empty');
         list.appendChild(empty);
         return;
@@ -121,12 +149,35 @@
         var connected = connectedProfiles.length > 0;
 
         var item = document.createElement('li');
-        item.className = 'paired-device';
+        item.className = 'paired-device device-row';
 
-        var info = document.createElement('span');
-        info.textContent = '[' + classified.iconId + '] ' + label + ' (' + tRef('device.kind.' + classified.kind) + ') — ' +
+        var main = document.createElement('span');
+        main.className = 'device-row-main';
+
+        var icon = document.createElement('span');
+        icon.className = 'device-row-icon';
+        icon.textContent = ICON_GLYPHS[classified.iconId] || ICON_GLYPHS.unknown;
+        main.appendChild(icon);
+
+        var text = document.createElement('span');
+        text.className = 'device-row-text';
+
+        var name = document.createElement('span');
+        name.className = 'device-row-name';
+        name.textContent = label;
+        text.appendChild(name);
+
+        var meta = document.createElement('span');
+        meta.className = 'device-row-meta ' + (connected ? 'device-row-meta--connected' : 'device-row-meta--disconnected');
+        meta.textContent = tRef('device.kind.' + classified.kind) + ' — ' +
           tRef(connected ? 'paired.connected' : 'paired.disconnected');
-        item.appendChild(info);
+        text.appendChild(meta);
+
+        main.appendChild(text);
+        item.appendChild(main);
+
+        var actions = document.createElement('span');
+        actions.className = 'device-row-actions';
 
         // A device whose class doesn't map to a supported profile (same
         // profile === null case discover.js filters out of its list)
@@ -136,20 +187,24 @@
         if (classified.profile !== null) {
           var toggleButton = document.createElement('button');
           toggleButton.type = 'button';
+          toggleButton.className = 'btn btn-secondary btn-compact';
           toggleButton.textContent = tRef(connected ? 'paired.disconnectButton' : 'paired.reconnectButton');
           toggleButton.addEventListener('click', function () {
             handleToggleConnection(device, classified, connected, label);
           });
-          item.appendChild(toggleButton);
+          actions.appendChild(toggleButton);
         }
 
         var forgetButton = document.createElement('button');
         forgetButton.type = 'button';
+        forgetButton.className = 'btn btn-danger btn-compact';
         forgetButton.textContent = tRef('paired.forgetButton');
         forgetButton.addEventListener('click', function () {
           handleForget(device, classified, label);
         });
-        item.appendChild(forgetButton);
+        actions.appendChild(forgetButton);
+
+        item.appendChild(actions);
 
         list.appendChild(item);
       });

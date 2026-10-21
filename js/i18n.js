@@ -100,6 +100,16 @@
     return activeLocale;
   }
 
+  // getLocale() -> string
+  //   Returns whichever shipped locale is currently active. Added for
+  //   js/screens/settings.js's manual language picker, which needs to
+  //   highlight the currently-selected option — `activeLocale` was a
+  //   private closure var with no existing getter before that screen
+  //   needed one.
+  function getLocale() {
+    return activeLocale;
+  }
+
   function interpolate(str, vars) {
     if (!vars) {
       return str;
@@ -128,11 +138,20 @@
   // (e.g. a test or screen that runs before app.js's startup detection).
   ensureLoaded(FALLBACK_LOCALE);
 
+  // LOCALE_OVERRIDE_STORAGE_KEY — the localStorage key js/app.js checks
+  // before auto-detecting the locale, and js/screens/settings.js writes
+  // when the user manually picks a language. Defined once here, shared
+  // by both files, rather than duplicated as a string literal in two
+  // places where a typo in one copy would silently break the override.
+  var LOCALE_OVERRIDE_STORAGE_KEY = 'bt-unlock.localeOverride';
+
   var api = {
     t: t,
     setLocale: setLocale,
+    getLocale: getLocale,
     normalizeLocale: normalizeLocale,
-    SHIPPED_LOCALES: SHIPPED_LOCALES
+    SHIPPED_LOCALES: SHIPPED_LOCALES,
+    LOCALE_OVERRIDE_STORAGE_KEY: LOCALE_OVERRIDE_STORAGE_KEY
   };
 
   if (typeof module !== 'undefined' && module.exports) {
@@ -140,5 +159,9 @@
   } else {
     global.t = t;
     global.setLocale = setLocale;
+    global.getLocale = getLocale;
+    global.normalizeLocale = normalizeLocale;
+    global.SHIPPED_LOCALES = SHIPPED_LOCALES;
+    global.LOCALE_OVERRIDE_STORAGE_KEY = LOCALE_OVERRIDE_STORAGE_KEY;
   }
 })(typeof window !== 'undefined' ? window : this);

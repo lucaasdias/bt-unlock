@@ -7,6 +7,7 @@
   "title": "BT Unlock",
   "icon": "icon.png",
   "largeIcon": "largeIcon.png",
+  "iconColor": "#0a0e16",
   "uiRevision": 2,
   "trustLevel": "default"
 }

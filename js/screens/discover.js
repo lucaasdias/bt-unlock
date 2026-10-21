@@ -40,6 +40,27 @@
   // way the unwrapped pair call used to.
   var CONNECT_TIMEOUT_MS = 20000;
 
+  // SEARCH_WINDOW_MS — this screen no longer polls forever once mounted.
+  // The user presses Search to start a bounded scan; it auto-stops after
+  // this long if they don't stop it manually first. 35s is comfortably
+  // longer than the adapter's own ~20s discoveryTimeout mentioned in
+  // scripts/bt-discover.sh's header (so a normal scan has time to
+  // actually find something) while still being a bounded "search", not
+  // an indefinite background scan the user has to remember is running.
+  var SEARCH_WINDOW_MS = 35000;
+
+  // ICON_GLYPHS — presentation-only map from devices.js's classify()
+  // iconId to a glyph shown inside the device-row's icon circle (Task 9
+  // design system). Purely cosmetic: no effect on classification/profile
+  // selection logic, which stays entirely in devices.js.
+  var ICON_GLYPHS = {
+    gamepad: '🎮',
+    keyboard: '⌨️',
+    mouse: '🖱️',
+    audio: '🎧',
+    unknown: '❓'
+  };
+
   // render(container: HTMLElement, navigate: (name: string) => void) -> Function
   //   Returns a cleanup function the router calls before tearing this
   //   screen down, so the polling timer never outlives the screen.
@@ -49,13 +70,37 @@
     var pollTimer = null;
     var pollInFlight = false;
     var busy = false; // true while a pair/connect sequence is running
+    var searching = false; // true while a bounded search window is active
+    var searchWindowTimer = null;
 
     var wrapper = document.createElement('div');
     wrapper.className = 'discover-screen';
 
+    // Heading + Search/Stop button share one row (.screen-header,
+    // css/app.css), same pattern just applied to paired.js's Refresh
+    // button after the human partner flagged a lone button floating
+    // between the heading and the list as visually disconnected.
+    var header = document.createElement('div');
+    header.className = 'screen-header';
+
     var heading = document.createElement('h1');
     heading.textContent = tRef('discover.heading');
-    wrapper.appendChild(heading);
+    header.appendChild(heading);
+
+    var searchButton = document.createElement('button');
+    searchButton.type = 'button';
+    searchButton.className = 'btn btn-primary';
+    searchButton.textContent = tRef('discover.searchButton');
+    searchButton.addEventListener('click', function () {
+      if (searching) {
+        stopSearch();
+      } else {
+        startSearch();
+      }
+    });
+    header.appendChild(searchButton);
+
+    wrapper.appendChild(header);
 
     var statusLabel = document.createElement('p');
     statusLabel.className = 'discover-status';
@@ -79,6 +124,74 @@
       }
     }
 
+    function clearSearchWindow() {
+      if (searchWindowTimer !== null) {
+        clearTimeout(searchWindowTimer);
+        searchWindowTimer = null;
+      }
+    }
+
+    function setSearchButtonLabel() {
+      searchButton.textContent = tRef(searching ? 'discover.stopSearchButton' : 'discover.searchButton');
+    }
+
+    // showIdleEmptyPromptIfEmpty() -> void
+    //   Shown in place of the device list whenever it's actually empty —
+    //   before the very first search, or after a search (timed out or
+    //   stopped manually) that found nothing. Never clears a list that
+    //   already has devices in it: per spec, devices found so far must
+    //   stay visible/selectable after a search ends, so this only adds
+    //   the prompt back when there is genuinely nothing to show.
+    function showIdleEmptyPromptIfEmpty() {
+      if (list.children.length === 0) {
+        var empty = document.createElement('li');
+        empty.className = 'list-empty';
+        empty.textContent = tRef('discover.searchPrompt');
+        list.appendChild(empty);
+      }
+    }
+
+    // startSearch() / stopSearch() — the bounded-search state machine.
+    // Discovery used to start automatically on mount and poll forever;
+    // now it only runs for up to SEARCH_WINDOW_MS after the user presses
+    // the button, and can be ended early the same way the button started
+    // it (click toggles based on `searching`).
+    function startSearch() {
+      if (busy || searching) {
+        return;
+      }
+      searching = true;
+      setSearchButtonLabel();
+      clearError();
+      startPolling();
+      searchWindowTimer = setTimeout(function () {
+        stopSearch();
+      }, SEARCH_WINDOW_MS);
+    }
+
+    // stopSearch() -> void
+    //   Ends the search whether triggered by the window elapsing or the
+    //   user pressing Stop. Stops client-side polling immediately; also
+    //   fires bt-discover.sh's `stop` subcommand (adapter/cancelDiscovery,
+    //   see scripts/bt-discover.sh) so the radio itself stops scanning too
+    //   rather than relying solely on the adapter's own ~20s
+    //   discoveryTimeout — best-effort and fire-and-forget, since there is
+    //   nothing actionable to show the user if this particular call fails
+    //   (client polling has already stopped either way, and the adapter's
+    //   own timeout is the fallback).
+    function stopSearch() {
+      if (!searching) {
+        return;
+      }
+      searching = false;
+      clearSearchWindow();
+      stopPolling();
+      setSearchButtonLabel();
+      statusLabel.textContent = '';
+      showIdleEmptyPromptIfEmpty();
+      execRef('bt-discover.sh', ['stop']).catch(function () {});
+    }
+
     function showError(message) {
       errorLabel.textContent = message;
       errorLabel.hidden = false;
@@ -90,6 +203,8 @@
     }
 
     function showAdapterOffPrompt() {
+      searching = false;
+      clearSearchWindow();
       stopPolling();
       wrapper.innerHTML = '';
       heading.textContent = tRef('discover.heading');
@@ -102,6 +217,7 @@
 
       var goToStatusButton = document.createElement('button');
       goToStatusButton.type = 'button';
+      goToStatusButton.className = 'btn btn-primary';
       goToStatusButton.textContent = tRef('discover.goToStatus');
       goToStatusButton.addEventListener('click', function () {
         navigate('status');
@@ -125,9 +241,30 @@
 
         var button = document.createElement('button');
         button.type = 'button';
+        button.className = 'device-row';
         button.disabled = busy;
         var label = device.name && device.name.length > 0 ? device.name : device.address;
-        button.textContent = '[' + classified.iconId + '] ' + label + ' (' + tRef('device.kind.' + classified.kind) + ')';
+
+        var icon = document.createElement('span');
+        icon.className = 'device-row-icon';
+        icon.textContent = ICON_GLYPHS[classified.iconId] || ICON_GLYPHS.unknown;
+        button.appendChild(icon);
+
+        var text = document.createElement('span');
+        text.className = 'device-row-text';
+
+        var name = document.createElement('span');
+        name.className = 'device-row-name';
+        name.textContent = label;
+        text.appendChild(name);
+
+        var meta = document.createElement('span');
+        meta.className = 'device-row-meta';
+        meta.textContent = tRef('device.kind.' + classified.kind);
+        text.appendChild(meta);
+
+        button.appendChild(text);
+
         button.addEventListener('click', function () {
           handleSelect(device, classified);
         });
@@ -177,6 +314,7 @@
     function setBusy(isBusy, message) {
       busy = isBusy;
       statusLabel.textContent = message || '';
+      searchButton.disabled = isBusy;
       Array.prototype.forEach.call(list.querySelectorAll('button'), function (button) {
         button.disabled = isBusy;
       });
@@ -289,11 +427,15 @@
         showAdapterOffPrompt();
         return;
       }
-      startPolling();
+      // Discovery no longer auto-starts on mount — idle until the user
+      // presses Search, per spec. Show the empty-state prompt so an
+      // otherwise-blank list doesn't look broken/stuck.
+      showIdleEmptyPromptIfEmpty();
     });
 
     return function cleanup() {
       stopPolling();
+      clearSearchWindow();
     };
   }
 

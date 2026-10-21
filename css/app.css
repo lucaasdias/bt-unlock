@@ -1,36 +1,601 @@
+/* app.css — BT Unlock design system (Task 9).
+ *
+ * A small, self-contained 10-foot-UI system: CSS custom properties for
+ * color/type/spacing, a reusable "device-row" component shared by
+ * discover.js and paired.js, consistent status/empty/error treatment,
+ * and a focus style that is a strict superset of Task 8's baseline
+ * (same mechanism — plain CSS :focus on a <button> — just bigger and
+ * higher-contrast). No hover-only states anywhere: this is a D-pad-only
+ * remote UI with no pointer, so ":hover" is never used as the sole way
+ * to reveal state.
+ *
+ * Reference pull (Task 9 Step 1): Mobbin screens for WHOOP's device
+ * settings (dark rounded cards, a colored connection-status label, bold
+ * action buttons), Roku/Starlink/Garmin Connect device lists (near-black
+ * background, icon-left rows, green "Connected" vs. muted "Offline"
+ * text) informed the row composition and status-color choice below.
+ * Literal spacing/type sizing is NOT from Mobbin (it's mobile/web
+ * content, viewed at arm's length) — that comes from how webOS's own
+ * Settings app, Android TV Settings and tvOS Settings size text and rows
+ * for couch viewing instead: one column, big rows, nothing smaller than
+ * is comfortably readable from ~2-3m.
+ */
+
+:root {
+  /* Color — dark theme + one accent ("Bluetooth blue"), matching the
+   * accent already introduced by Task 8's focus style so this redesign
+   * reads as an evolution of it, not a clash. */
+  --color-bg: #0a0e16;
+  --color-bg-elevated: #0f1522;
+  --color-surface: #19212f;
+  --color-surface-raised: #212b3c;
+  --color-border: #2b3650;
+  --color-text: #f3f6fa;
+  --color-text-muted: #9fb0c6;
+  --color-text-faint: #6c7a91;
+  --color-accent: #49c9ff;
+  --color-accent-strong: #21b6ff;
+  --color-accent-ink: #052330;
+  --color-success: #3ddc97;
+  --color-danger: #ff6b6b;
+  --color-danger-strong: #ff8787;
+
+  /* Type scale — every size here was picked to stay legible at ~2-3m
+   * (sofa distance), not desk distance: even the "meta" size is well
+   * above normal web body-copy size. */
+  --text-title: 48px;
+  --text-nav: 28px;
+  --text-row: 32px;
+  --text-meta: 24px;
+  --text-body: 26px;
+
+  /* Spacing scale (4-based, generous — TV safe margins). */
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --space-5: 48px;
+  --space-6: 64px;
+
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
+
+  --safe-margin: 56px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* A JS-toggled `hidden` attribute must always actually hide the element.
+ * Without this, a `<button class="btn">`'s own explicit `display:
+ * inline-flex` (an author rule) wins the cascade over the browser's
+ * default `[hidden] { display: none }` UA-stylesheet rule — author
+ * rules always beat UA-stylesheet rules regardless of selector
+ * specificity, so `.btn`'s rule was silently keeping status.js's
+ * adapter-power toggle button visually on screen even while
+ * `toggleButton.hidden = true` correctly excluded it from
+ * js/router.js's focusable rows once the adapter was already on. That
+ * mismatch — a button the user can SEE but the remote correctly can't
+ * reach — read as "the D-pad can't reach the Bluetooth button," a real
+ * bug caught live, not a router.js focus defect (router.js's own
+ * grouping/filtering logic was already correct). This single rule fixes
+ * it for every current and future hidden-toggled element in the app,
+ * not just this one button. */
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   margin: 0;
   height: 100%;
-  background: #000;
-  color: #fff;
-  font-family: sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: var(--text-body);
 }
 
-.placeholder {
+#app {
+  min-height: 100%;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
+  flex-direction: column;
 }
 
-.placeholder p {
-  font-size: 48px;
+ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+button {
+  font-family: inherit;
+}
+
+/* ---- Top navigation bar (router.js's three screen tabs) ---- */
+
+.app-nav {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--safe-margin) var(--space-2);
+  background: var(--color-bg-elevated);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.app-nav-button {
+  background: transparent;
+  border: 2px solid transparent;
+  color: var(--color-text-muted);
+  font-size: var(--text-nav);
+  font-weight: 600;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
+  cursor: default;
+}
+
+.app-nav-button[aria-current="true"] {
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+}
+
+/* ---- Screen container ---- */
+
+.app-screen {
+  flex: 1;
+  padding: var(--space-4) var(--safe-margin) var(--space-6);
+}
+
+.screen-title,
+h1 {
+  font-size: var(--text-title);
+  font-weight: 700;
+  margin: 0 0 var(--space-4);
+  letter-spacing: -0.01em;
+}
+
+/* A screen's heading sharing one row with a single action button next to
+ * it (paired.js's Refresh, discover.js's Search/Stop) instead of the
+ * button sitting as its own separate block between the heading and the
+ * list — a lone button there reads as visually disconnected from both.
+ * h1's own bottom margin is suppressed here since this row's own
+ * margin-bottom already provides that spacing.
+ *
+ * align-items is flex-start, not center: the action button (min-height
+ * 72px) is taller than the heading's own text line, and centering them
+ * would vertically shift the heading DOWN inside this taller row —
+ * exactly the bug the human partner caught live ("Bluetooth" on
+ * status.js, which has no button next to its own bare <h1> and so never
+ * got this shift, sat visibly higher than "Dispositivos pareados"/
+ * "Descobrir dispositivos", whose headings ARE inside this row). With
+ * flex-start, the heading's top edge lines up with the row's own top
+ * edge regardless of whether a taller sibling button is present next to
+ * it — the same vertical position a bare <h1> (status.js's heading, left
+ * outside this component entirely) already sits at. */
+.screen-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.screen-header h1 {
   margin: 0;
 }
 
-/* Remote-control focus (Task 8).
+/* One toggle's pill + button, side by side (status.js: the adapter-power
+ * row and the "start on TV boot" row). Several `.status-row`s stack
+ * vertically as ordinary block-level siblings — the fix for a real
+ * layout bug where a bare `<p class="state-pill">` (itself
+ * `display:inline-block`, so it stopped breaking onto its own line) sat
+ * flowed together with its neighboring buttons into one single run-on
+ * horizontal line instead of one row per toggle. */
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+/* Per the human partner's live feedback: the "start on TV boot" row's
+ * button sits BELOW its label rather than beside it, unlike the adapter
+ * row (which keeps the side-by-side layout). A modifier rather than a
+ * second component, since everything else about the row (pill styling,
+ * spacing) stays the same. */
+.status-row--stacked {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* A sub-section heading smaller than the screen's own <h1> (status.js's
+ * log viewer and settings.js's "Idioma"/"Ajuda" sections) — its own
+ * margin reset means it doesn't need `.screen-header h1`'s override to
+ * sit flush against a neighboring action button. */
+.section-heading {
+  font-size: var(--text-row);
+  font-weight: 700;
+  margin: 0;
+}
+
+/* ---- Status screen's two-column layout ----
  *
- * Every row in this app is a plain <button>, so one rule covers the nav
- * bar and every screen's rows alike. Deliberately loud — big filled
- * background plus a thick, high-contrast outline — because this has to
- * read from sofa distance on a TV, not just pass a mouse-hover glance.
- * Task 9 replaces this with the full visual redesign's own focus style,
- * built on top of the same D-pad logic (js/router.js) this unblocks.
+ * Left column: adapter-power row, the off-button + its confirmation
+ * warning, and the "start on TV boot" row. Right column: the log
+ * viewer, as its own dedicated box to the side — per the human
+ * partner's original request and photo, and reinforced by live
+ * feedback that it was reading as squeezed into the main column
+ * instead. flex-wrap (not a media query) is this app's existing
+ * responsive approach elsewhere too — on a narrow viewport the log
+ * panel simply wraps below the main column instead of squeezing it. */
+.status-columns {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-5);
+}
+
+.status-main {
+  flex: 1 1 420px;
+  min-width: 0;
+}
+
+.status-log-panel {
+  flex: 1 1 420px;
+  min-width: 0;
+}
+
+/* ---- Log viewer (status.js) ---- */
+
+.log-box {
+  font-family: "SF Mono", "Courier New", monospace;
+  font-size: var(--text-meta);
+  line-height: 1.5;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin: 0 0 var(--space-4);
+  max-height: 420px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* A focused `.scrollable-content` element (just the log box today —
+ * see js/router.js's isScrollable()/tryScroll()) gets a border/glow
+ * highlight like any other focused control, but WITHOUT inverting its
+ * background/text to the accent color the way `button:focus` does —
+ * that would make the log text itself unreadable against the accent
+ * background, which makes sense for a button's own label but not for a
+ * whole panel of content. */
+.scrollable-content:focus {
+  outline: none;
+  border-color: var(--color-accent-strong);
+  box-shadow: 0 0 0 6px rgba(73, 201, 255, 0.35);
+}
+
+/* ---- Confirmation warning (status.js's "turn Bluetooth off" flow —
+ * the app's first destructive/risky action, shown with an explicit
+ * warning + separate Confirm/Cancel buttons rather than a native
+ * confirm() dialog, which has no D-pad affordance). Visually a stronger,
+ * non-dismissed-by-default sibling of `.status-error`'s danger-tinted
+ * treatment, since this is a warning about to happen, not a report of
+ * something that already failed. */
+.status-warning {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  color: var(--color-text);
+  background: rgba(255, 107, 107, 0.12);
+  border: 1px solid rgba(255, 107, 107, 0.4);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin: 0 0 var(--space-3);
+}
+
+.status-warning .btn {
+  align-self: flex-start;
+}
+
+/* ---- Settings screen ---- */
+
+.settings-screen .section-heading {
+  margin-top: var(--space-4);
+  margin-bottom: var(--space-2);
+}
+
+/* Reuses `.device-row`'s grouping semantics (router.js's findRowKey()
+ * keys off that class, so Left/Right moves between these three
+ * language buttons, matching paired.js's own Disconnect/Forget row)
+ * without its card visual styling, which is meant for a device-list
+ * entry, not a plain button group. `.language-row.device-row` (two
+ * classes) beats plain `.device-row` (one class) on specificity, so
+ * this reliably wins regardless of each rule's order in this file. */
+.language-row.device-row {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-bottom: var(--space-3);
+}
+
+/* ---- Help / QR panel (settings.js's right column) ----
+ *
+ * Third design for this panel: inline (got visually cut off at a
+ * legible size), then a full-screen modal (worked, but the human
+ * partner wanted it docked instead, matching status.js's Log viewer
+ * box rather than a popup), now this — an always-visible panel docked
+ * in the right column, same `.status-log-panel` container status.js's
+ * own log box uses. No modal/focus-trap machinery needed any more:
+ * this is just an ordinary, non-interactive part of the Settings
+ * screen's content, nothing router.js needs to know about.
+ *
+ * `.help-qr-panel` bounds itself the same way `.log-box` bounds the
+ * log viewer (a max-height, so it can never grow past the screen even
+ * before `.status-columns`' own flex-wrap kicks in); `.help-qr-svg` has
+ * NO fixed pixel size at all — `width: 100%; height: auto` scales the
+ * SVG down to fit `.help-qr`'s own max-width, preserving the QR's
+ * square aspect ratio via its `viewBox`. This is the actual fix for
+ * the cut-off bug: a fixed 320x320 size, not a bounded container, is
+ * exactly what overflowed past the screen edge before. */
+.help-qr-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  max-height: 420px;
+}
+
+.help-qr {
+  flex: none;
+  width: 100%;
+  max-width: 260px;
+  background: #ffffff;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+}
+
+.help-qr-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  shape-rendering: crispEdges;
+}
+
+.help-url {
+  font-size: var(--text-body);
+  color: var(--color-text-muted);
+  word-break: break-all;
+  text-align: center;
+  max-width: 260px;
+}
+
+/* ---- Status / empty / error / loading text (shared feel across all
+ * three screens, per spec: consistent empty/loading/error state styling) ---- */
+
+.status-state,
+.discover-status,
+.paired-status {
+  font-size: var(--text-body);
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-3);
+  min-height: 1.4em;
+}
+
+.status-error,
+.discover-error,
+.paired-error {
+  font-size: var(--text-body);
+  color: var(--color-danger-strong);
+  background: rgba(255, 107, 107, 0.12);
+  border: 1px solid rgba(255, 107, 107, 0.4);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  margin: 0 0 var(--space-3);
+}
+
+.status-error[hidden],
+.discover-error[hidden],
+.paired-error[hidden] {
+  display: none;
+}
+
+/* A status/adapter-state pill, applied via JS by toggling a modifier
+ * class alongside the existing .status-state element — no markup
+ * restructuring needed beyond that class toggle. */
+.state-pill {
+  display: inline-block;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+  background: var(--color-surface-raised);
+  color: var(--color-text-muted);
+}
+
+.state-pill--on {
+  background: rgba(61, 220, 151, 0.16);
+  color: var(--color-success);
+}
+
+.state-pill--off {
+  background: rgba(255, 107, 107, 0.14);
+  color: var(--color-danger-strong);
+}
+
+/* ---- Buttons ---- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  font-size: var(--text-row);
+  font-weight: 600;
+  color: var(--color-text);
+  background: var(--color-surface-raised);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-4);
+  min-height: 72px;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+}
+
+.btn-primary {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  border-color: var(--color-accent);
+}
+
+.btn-danger {
+  background: transparent;
+  color: var(--color-danger-strong);
+  border-color: rgba(255, 107, 107, 0.5);
+}
+
+.btn-secondary {
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+}
+
+.btn-compact {
+  font-size: var(--text-meta);
+  padding: var(--space-1) var(--space-3);
+  min-height: 56px;
+}
+
+/* ---- Device row component (shared by discover.js and paired.js) ----
+ *
+ * Spec calls for "icon/name/status/action, used identically by
+ * discover.js and paired.js". Discover's whole row is one <button>
+ * (selecting = pairing), so .device-row is applied directly to the
+ * <button>; paired.js's row has its own action buttons, so .device-row
+ * there wraps the <li> and the icon/name/status become a plain
+ * .device-row-main block beside the action buttons. Either way the
+ * icon/name/status layout and sizing is identical. */
+
+.device-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  text-align: left;
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3);
+  margin-bottom: var(--space-2);
+  color: var(--color-text);
+}
+
+li.device-row {
+  display: flex;
+}
+
+button.device-row {
+  cursor: default;
+}
+
+button.device-row:disabled {
+  opacity: 0.5;
+}
+
+.device-row-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 1;
+  min-width: 0;
+}
+
+.device-row-icon {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-pill);
+  background: var(--color-bg-elevated);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+}
+
+.device-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.device-row-name {
+  font-size: var(--text-row);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.device-row-meta {
+  font-size: var(--text-meta);
+  color: var(--color-text-muted);
+}
+
+.device-row-meta--connected {
+  color: var(--color-success);
+}
+
+.device-row-meta--disconnected {
+  color: var(--color-text-faint);
+}
+
+.device-row-actions {
+  flex: none;
+  display: flex;
+  gap: var(--space-2);
+}
+
+.list-empty {
+  font-size: var(--text-row);
+  color: var(--color-text-muted);
+  padding: var(--space-4) 0;
+}
+
+/* ---- Remote-control focus (Task 8 baseline, Task 9 full redesign) ----
+ *
+ * Still a plain CSS :focus rule on whichever <button> the router
+ * (js/router.js) has given logical focus to — same mechanism Task 8
+ * shipped, unchanged. This is a strict superset of that baseline: the
+ * old version (thick outline + flat background swap) is still here in
+ * spirit, just bigger, higher-contrast, and consistent with the rest of
+ * the system's radius/spacing instead of being a bare rectangle. No
+ * ":hover" rule exists anywhere in this file — there is no pointer on a
+ * TV remote, so hover is never the only way to reveal a focus/active
+ * state.
  */
 button:focus {
-  outline: 4px solid #5cc8ff;
-  outline-offset: 2px;
-  background-color: #1f3a52;
-  color: #fff;
+  outline: none;
+  border-color: var(--color-accent-strong);
+  background-color: var(--color-accent);
+  color: var(--color-accent-ink);
+  box-shadow: 0 0 0 6px rgba(73, 201, 255, 0.35);
+}
+
+button.device-row:focus .device-row-icon {
+  background: rgba(5, 35, 48, 0.35);
+}
+
+button.device-row:focus .device-row-meta,
+button.device-row:focus .device-row-meta--connected,
+button.device-row:focus .device-row-meta--disconnected {
+  color: var(--color-accent-ink);
+}
+
+.app-nav-button:focus {
+  background-color: var(--color-accent);
+  color: var(--color-accent-ink);
+  box-shadow: 0 0 0 6px rgba(73, 201, 255, 0.35);
 }

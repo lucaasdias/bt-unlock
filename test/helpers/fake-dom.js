@@ -62,7 +62,14 @@ function createFakeDom() {
   function matchesPart(el, part) {
     if (part.charAt(0) === '.') {
       var cls = part.slice(1);
-      return (' ' + (el._className || '') + ' ').indexOf(' ' + cls + ' ') !== -1;
+      // Checks both the `className` property AND a `class` attribute
+      // set via setAttribute() — real SVG elements' `className` is a
+      // read-only SVGAnimatedString, so js/screens/settings.js's QR-code
+      // SVG sets its class via setAttribute('class', ...) instead, same
+      // as it would have to against a real browser DOM.
+      var classFromProperty = ' ' + (el._className || '') + ' ';
+      var classFromAttr = ' ' + (el._attrs['class'] || '') + ' ';
+      return classFromProperty.indexOf(' ' + cls + ' ') !== -1 || classFromAttr.indexOf(' ' + cls + ' ') !== -1;
     }
     if (part.charAt(0) === '[') {
       var attr = part.slice(1, -1);
@@ -207,6 +214,15 @@ function createFakeDom() {
 
   var fakeDocument = {
     createElement: function (tagName) {
+      return new FakeElement(tagName);
+    },
+    // createElementNS(ns, tagName) — added for test/settings.test.js's
+    // QR-code SVG rendering (js/screens/settings.js uses it to build an
+    // inline <svg>). This shim has no real namespace concept at all
+    // (nothing here ever renders to a real DOM/screen), so it's just an
+    // alias for createElement — router.js, the only other consumer of
+    // this fake document, never calls it.
+    createElementNS: function (ns, tagName) {
       return new FakeElement(tagName);
     },
     get activeElement() {
